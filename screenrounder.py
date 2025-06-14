@@ -284,6 +284,7 @@ def get_system_language():
 CURRENT_LANG = get_system_language()
 tr = lambda text: LANGUAGES[CURRENT_LANG].get(text, text)
 
+
 class CornerWindow(QtWidgets.QWidget):
     def __init__(self, screen, position: str, radius: int, color: QtGui.QColor, 
                  anti_burn_in=False, hide_mouse=False):
@@ -296,7 +297,6 @@ class CornerWindow(QtWidgets.QWidget):
         self.hide_mouse = hide_mouse
         self.original_pos = None
         self.last_move_time = time.time()
-        self.hwnd = None  # 存储窗口句柄
 
         # Windows 兼容性设置
         if sys.platform == "win32":
@@ -306,13 +306,10 @@ class CornerWindow(QtWidgets.QWidget):
             except:
                 pass
             
-        # 修改窗口标志
         self.setWindowFlags(
             QtCore.Qt.WindowType.FramelessWindowHint |
             QtCore.Qt.WindowType.WindowStaysOnTopHint |
-            QtCore.Qt.WindowType.Tool |
-            QtCore.Qt.WindowType.BypassWindowManagerHint |
-            QtCore.Qt.WindowType.X11BypassWindowManagerHint
+            QtCore.Qt.WindowType.Tool
         )
         
         # 设置更高的Z序以确保在任务栏前
@@ -329,64 +326,6 @@ class CornerWindow(QtWidgets.QWidget):
         self.burn_in_timer.timeout.connect(self.anti_burn_in_update)
         if self.anti_burn_in:
             self.burn_in_timer.start(60 * 1000)  # 每分钟检查一次
-            
-        # 置顶检查定时器
-        self.topmost_timer = QtCore.QTimer(self)
-        self.topmost_timer.timeout.connect(self.ensure_topmost)
-        self.topmost_timer.start(1000)  # 每秒检查一次置顶状态
-        
-        # 窗口显示后获取句柄
-        self.showEvent = self.on_show_event
-
-    def on_show_event(self, event):
-        """窗口显示时获取句柄并强制置顶"""
-        super().showEvent(event)
-        self.hwnd = int(self.winId())
-        self.force_topmost()
-        
-    def force_topmost(self):
-        """强制窗口置于最顶层"""
-        if not self.hwnd:
-            return
-            
-        try:
-            # 设置窗口为最顶层
-            ctypes.windll.user32.SetWindowPos(
-                self.hwnd, 
-                -1,  # HWND_TOPMOST
-                0, 0, 0, 0,
-                0x0001 | 0x0002 | 0x0010  # SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-            )
-            
-            # 设置窗口为系统覆盖窗口
-            ex_style = ctypes.windll.user32.GetWindowLongW(self.hwnd, -20)  # GWL_EXSTYLE
-            ex_style |= 0x00000008  # WS_EX_TOPMOST
-            ex_style |= 0x00000080  # WS_EX_TOOLWINDOW
-            ex_style |= 0x00000020  # WS_EX_TRANSPARENT (允许鼠标穿透)
-            ctypes.windll.user32.SetWindowLongW(self.hwnd, -20, ex_style)
-            
-            # 再次确认置顶
-            ctypes.windll.user32.SetWindowPos(
-                self.hwnd, 
-                -1,  # HWND_TOPMOST
-                0, 0, 0, 0,
-                0x0001 | 0x0002 | 0x0010  # SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-            )
-        except Exception as e:
-            print(f"强制置顶失败: {e}")
-
-    def ensure_topmost(self):
-        """确保窗口始终位于最顶层"""
-        if not self.isVisible() or not self.hwnd:
-            return
-            
-        try:
-            # 检查窗口是否在最顶层
-            top_window = ctypes.windll.user32.GetTopWindow(0)
-            if top_window != self.hwnd:
-                self.force_topmost()
-        except:
-            pass
 
     def update_geometry(self):
         screen_geo = self.screen.geometry()
@@ -458,13 +397,6 @@ class CornerWindow(QtWidgets.QWidget):
         if self.original_pos:
             self.move(self.original_pos[0], self.original_pos[1])
             self.update()
-            
-    def winEvent(self, event):
-        """处理Windows消息"""
-        if event.message == 0x0046:  # WM_WINDOWPOSCHANGING
-            # 防止窗口位置被改变
-            return True
-        return super().winEvent(event)
 
 
 class TrayApp(QtWidgets.QSystemTrayIcon):
@@ -646,17 +578,12 @@ class MainWindow(QtWidgets.QWidget):
         self.container = QtWidgets.QFrame()
         self.container.setObjectName("mainContainer")
         self.container_layout = QtWidgets.QVBoxLayout(self.container)
-        
-        # 增加容器内边距，特别是左右边距
-        self.container_layout.setContentsMargins(20, 15, 20, 15)  # 左右边距增加到20px
+        self.container_layout.setContentsMargins(20, 20, 20, 20)
         self.container_layout.setSpacing(15)
         
         # 圆角半径设置
         self.radius_layout = QtWidgets.QHBoxLayout()
-        
-        # 为标签添加边距
         self.radius_label = QtWidgets.QLabel(tr("radius_label"))
-        self.radius_label.setContentsMargins(8, 0, 8, 0)  # 添加左右边距（约一个空格字符）
         self.radius_layout.addWidget(self.radius_label)
         
         self.radius_spin = QtWidgets.QSpinBox()
@@ -677,10 +604,7 @@ class MainWindow(QtWidgets.QWidget):
         
         # 颜色设置
         self.color_layout = QtWidgets.QHBoxLayout()
-        
-        # 为标签添加边距
         self.color_label = QtWidgets.QLabel(tr("color_label"))
-        self.color_label.setContentsMargins(8, 0, 8, 0)  # 添加左右边距（约一个空格字符）
         self.color_layout.addWidget(self.color_label)
         
         self.color_preview = QtWidgets.QFrame()
@@ -735,7 +659,6 @@ class MainWindow(QtWidgets.QWidget):
         
         # 刷新间隔标签和输入框
         self.anti_burn_interval_label = QtWidgets.QLabel(tr("anti_burn_in_interval"))
-        self.anti_burn_interval_label.setContentsMargins(8, 0, 8, 0)  # 添加左右边距（约一个空格字符）
         self.anti_burn_layout.addWidget(self.anti_burn_interval_label)
         
         self.anti_burn_in_interval = QtWidgets.QSpinBox()
@@ -754,7 +677,6 @@ class MainWindow(QtWidgets.QWidget):
         self.transparent_mouse_check = QtWidgets.QCheckBox(tr("transparent_mouse"))
         self.transparent_mouse_check.setToolTip(tr("transparent_mouse_tip"))
         self.transparent_mouse_check.setObjectName("transparentMouseCheck")
-        self.transparent_mouse_check.setContentsMargins(8, 0, 8, 0)  # 添加左右边距（约一个空格字符）
         self.mouse_layout.addWidget(self.transparent_mouse_check)
         
         self.mouse_layout.addStretch()
@@ -803,16 +725,6 @@ class MainWindow(QtWidgets.QWidget):
         self.theme_timer = QtCore.QTimer(self)
         self.theme_timer.timeout.connect(self.check_theme_change)
         self.theme_timer.start(10000)  # 每10秒检查一次主题变化，减少频率
-        
-        # 添加任务栏状态监听
-        self.taskbar_timer = QtCore.QTimer(self)
-        self.taskbar_timer.timeout.connect(self.check_taskbar_state)
-        self.taskbar_timer.start(2000)  # 每2秒检查一次任务栏状态
-        
-        # 添加窗口刷新定时器
-        self.refresh_timer = QtCore.QTimer(self)
-        self.refresh_timer.timeout.connect(self.refresh_corners)
-        self.refresh_timer.start(5000)  # 每5秒刷新一次窗口位置
         
         # 关闭行为记忆
         self.close_action = None
@@ -877,22 +789,6 @@ class MainWindow(QtWidgets.QWidget):
         if new_theme != self.current_theme:
             self.current_theme = new_theme
             self.apply_theme()
-    
-    def check_taskbar_state(self):
-        """检查任务栏位置是否变化"""
-        try:
-            # 使用Windows API获取任务栏位置
-            appbar_data = ctypes.windll.shell32.APPBARDATA()
-            appbar_data.cbSize = ctypes.sizeof(appbar_data)
-            if ctypes.windll.shell32.SHAppBarMessage(4, ctypes.byref(appbar_data)):  # ABM_GETTASKBARPOS
-                # 如果任务栏位置发生变化，刷新圆角
-                current_pos = (appbar_data.rc.left, appbar_data.rc.top, 
-                              appbar_data.rc.right, appbar_data.rc.bottom)
-                if hasattr(self, 'last_taskbar_pos') and current_pos != self.last_taskbar_pos:
-                    self.refresh_corners()
-                self.last_taskbar_pos = current_pos
-        except:
-            pass
     
     def apply_theme(self):
         # 设置窗口图标
@@ -1118,7 +1014,6 @@ class MainWindow(QtWidgets.QWidget):
         self.save_config()
     
     def refresh_corners(self):
-        """刷新圆角窗口，确保正确位置和层级"""
         # 清除现有圆角
         for w in self.corners:
             w.close()
@@ -1135,33 +1030,9 @@ class MainWindow(QtWidgets.QWidget):
                                 self.corner_color, self.anti_burn_in_enabled,
                                 self.transparent_mouse_enabled)
                 w.show()
-                
-                # 强制窗口显示在最前面
-                w.raise_()
-                w.activateWindow()
-                
                 self.corners.append(w)
-        
-        # 延迟确保所有窗口创建完成
-        QtCore.QTimer.singleShot(100, self.force_all_topmost)
-        
-    def force_all_topmost(self):
-        """强制所有圆角窗口置顶"""
-        for w in self.corners:
-            if hasattr(w, 'hwnd') and w.hwnd:
-                try:
-                    # 设置窗口为最顶层
-                    ctypes.windll.user32.SetWindowPos(
-                        w.hwnd, 
-                        -1,  # HWND_TOPMOST
-                        0, 0, 0, 0,
-                        0x0001 | 0x0002 | 0x0010  # SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-                    )
-                except:
-                    pass
     
     def handle_screen_change(self):
-        """处理屏幕变化事件"""
         # 延迟执行以确保屏幕信息已更新
         QtCore.QTimer.singleShot(1000, self.refresh_corners)
     
@@ -1241,10 +1112,6 @@ class MainWindow(QtWidgets.QWidget):
 
 
 def main():
-    # 检查是否已存在实例
-    if last_error == 183:  # ERROR_ALREADY_EXISTS
-        sys.exit(1)
-        
     app = QtWidgets.QApplication(sys.argv)
     
     # 设置Windows 11风格
@@ -1282,6 +1149,7 @@ def main():
     app.setQuitOnLastWindowClosed(False)
     
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()
