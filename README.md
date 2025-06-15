@@ -5,4 +5,4 @@
 
 ![主界面](https://github.com/user-attachments/assets/36529b57-f26c-4f7b-bab8-fc005982376e)
 
-![托盘菜单](https://github.com/user-attachments/assets/4ed23fea-3c82-477c-8f25-bb4025fae84a)
+![托盘菜单](https://github.com/user-attachments/assets/170f2eee-c850-4b27-a017-8f8b9462e4a1)
