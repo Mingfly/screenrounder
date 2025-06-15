@@ -284,10 +284,9 @@ def get_system_language():
 CURRENT_LANG = get_system_language()
 tr = lambda text: LANGUAGES[CURRENT_LANG].get(text, text)
 
-
 class CornerWindow(QtWidgets.QWidget):
     def __init__(self, screen, position: str, radius: int, color: QtGui.QColor, 
-                 anti_burn_in=False, hide_mouse=False):
+                 anti_burn_in=False, hide_mouse=False, burn_in_interval=10):
         super().__init__()
         self.screen = screen
         self.position = position
@@ -295,8 +294,10 @@ class CornerWindow(QtWidgets.QWidget):
         self.color = color
         self.anti_burn_in = anti_burn_in
         self.hide_mouse = hide_mouse
+        self.burn_in_interval = burn_in_interval  # 分钟
         self.original_pos = None
         self.last_move_time = time.time()
+        self.last_reset_time = time.time()
 
         # Windows 兼容性设置
         if sys.platform == "win32":
@@ -306,10 +307,13 @@ class CornerWindow(QtWidgets.QWidget):
             except:
                 pass
             
+        # 设置窗口标志确保置顶且不会获取焦点
         self.setWindowFlags(
             QtCore.Qt.WindowType.FramelessWindowHint |
             QtCore.Qt.WindowType.WindowStaysOnTopHint |
-            QtCore.Qt.WindowType.Tool
+            QtCore.Qt.WindowType.Tool |
+            QtCore.Qt.WindowType.BypassWindowManagerHint |
+            QtCore.Qt.WindowType.WindowDoesNotAcceptFocus  # 修正为正确的标志
         )
         
         # 设置更高的Z序以确保在任务栏前
@@ -321,12 +325,56 @@ class CornerWindow(QtWidgets.QWidget):
         
         self.update_geometry()
 
+        # 强制窗口置顶（Windows API方法）
+        self.set_topmost()
+        
+        # 添加定时器确保窗口始终置顶（PyQt方法）
+        self.topmost_timer = QtCore.QTimer(self)
+        self.topmost_timer.timeout.connect(self.ensure_topmost)
+        self.topmost_timer.start(1000)  # 每秒检查一次
+
         # 防烧屏定时器
         self.burn_in_timer = QtCore.QTimer(self)
         self.burn_in_timer.timeout.connect(self.anti_burn_in_update)
         if self.anti_burn_in:
-            self.burn_in_timer.start(60 * 1000)  # 每分钟检查一次
+            self.start_anti_burn_in_timer()
 
+    def start_anti_burn_in_timer(self):
+        """启动防烧屏定时器，使用当前设置的间隔时间"""
+        if self.anti_burn_in:
+            interval = self.burn_in_interval * 60 * 1000  # 转换为毫秒
+            self.burn_in_timer.start(interval)
+            
+    def update_burn_in_interval(self, new_interval):
+        """更新防烧屏间隔时间"""
+        self.burn_in_interval = new_interval
+        if self.anti_burn_in:
+            self.burn_in_timer.stop()
+            self.start_anti_burn_in_timer()
+
+    def set_topmost(self):
+        """使用Windows API强制窗口置顶"""
+        if sys.platform == "win32":
+            try:
+                hwnd = self.winId().__int__()
+                # 设置窗口为最顶层 (HWND_TOPMOST)
+                ctypes.windll.user32.SetWindowPos(
+                    hwnd, 
+                    -1,  # HWND_TOPMOST
+                    0, 0, 0, 0, 
+                    0x0001 | 0x0002 | 0x0010  # SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                )
+            except Exception as e:
+                print(f"设置窗口置顶失败: {e}")
+
+    # 确保刷新时不会影响主窗口
+    def ensure_topmost(self):
+        """使用PyQt方法确保窗口在最顶层但不会获取焦点"""
+        if not self.isActiveWindow():
+            self.raise_()
+            # 不激活窗口，避免抢焦点
+            # self.activateWindow()  # 注释掉这行
+    
     def update_geometry(self):
         screen_geo = self.screen.geometry()
         r = self.radius
@@ -353,6 +401,9 @@ class CornerWindow(QtWidgets.QWidget):
                              scaled_r, scaled_r)
             self.original_pos = (screen_geo.x() + screen_geo.width() - scaled_r, 
                                  screen_geo.y() + screen_geo.height() - scaled_r)
+        
+        # 更新后确保窗口置顶
+        self.ensure_topmost()
         self.update()
 
     def paintEvent(self, event):
@@ -381,23 +432,24 @@ class CornerWindow(QtWidgets.QWidget):
             return
             
         current_time = time.time()
-        # 每5分钟微移一次位置
-        if current_time - self.last_move_time > 300:
-            dx = random.randint(-2, 2)
-            dy = random.randint(-2, 2)
+        # 使用用户设置的间隔时间进行微移
+        if current_time - self.last_move_time > self.burn_in_interval * 60:
+            dx = random.randint(-1, 1)
+            dy = random.randint(-1, 1)
             self.move(self.x() + dx, self.y() + dy)
             self.last_move_time = current_time
             
-        # 每60分钟重置位置
-        if current_time - self.last_move_time > 3600:
+        # 每60分钟重置位置（固定值）
+        if current_time - self.last_reset_time > 3600:
             self.reset_position()
-            self.last_move_time = current_time
+            self.last_reset_time = current_time
 
     def reset_position(self):
         if self.original_pos:
             self.move(self.original_pos[0], self.original_pos[1])
             self.update()
-
+            # 重置位置后重新置顶
+            self.ensure_topmost()
 
 class TrayApp(QtWidgets.QSystemTrayIcon):
     def __init__(self, icon, parent=None):
@@ -489,7 +541,11 @@ class TrayApp(QtWidgets.QSystemTrayIcon):
         exit_action.triggered.connect(self.quit_application)
 
     def quit_application(self):
+        # 直接退出程序，不经过主窗口的关闭确认
         self.parent.save_config()
+        # 关闭所有圆角窗口
+        for corner in self.parent.corners:
+            corner.close()
         QtWidgets.QApplication.quit()
         
     def change_language(self):
@@ -989,7 +1045,7 @@ class MainWindow(QtWidgets.QWidget):
         for w in self.corners:
             w.anti_burn_in = self.anti_burn_in_enabled
             if self.anti_burn_in_enabled:
-                w.burn_in_timer.start(self.anti_burn_in_interval.value() * 60 * 1000)
+                w.start_anti_burn_in_timer()
             else:
                 w.burn_in_timer.stop()
                 w.reset_position()
@@ -1008,9 +1064,7 @@ class MainWindow(QtWidgets.QWidget):
     def update_burn_in_interval(self, value):
         # 更新所有窗口的定时器间隔
         for w in self.corners:
-            if w.anti_burn_in:
-                w.burn_in_timer.stop()
-                w.burn_in_timer.start(value * 60 * 1000)
+            w.update_burn_in_interval(value)
         self.save_config()
     
     def refresh_corners(self):
@@ -1028,9 +1082,15 @@ class MainWindow(QtWidgets.QWidget):
             for pos in ['tl', 'tr', 'bl', 'br']:
                 w = CornerWindow(screen, pos, self.radius_spin.value(), 
                                 self.corner_color, self.anti_burn_in_enabled,
-                                self.transparent_mouse_enabled)
+                                self.transparent_mouse_enabled,
+                                self.anti_burn_in_interval.value())  # 传递防烧屏间隔
                 w.show()
                 self.corners.append(w)
+        
+        # 确保主窗口保持焦点
+        if self.isVisible():
+            self.raise_()
+            self.activateWindow()
     
     def handle_screen_change(self):
         # 延迟执行以确保屏幕信息已更新
@@ -1039,10 +1099,10 @@ class MainWindow(QtWidgets.QWidget):
     def closeEvent(self, event):
         # 如果有记忆的关闭行为，直接执行
         if self.close_action is not None:
-            if self.close_action == 0:
+            if self.close_action == 0:  # 退出
                 self.save_config()
                 QtWidgets.QApplication.quit()
-            else:
+            else:  # 最小化到托盘
                 event.ignore()
                 self.hide()
             return
@@ -1088,27 +1148,17 @@ class MainWindow(QtWidgets.QWidget):
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             if remember_check.isChecked() and user_action[0] is not None:
                 self.close_action = user_action[0]
-                self.save_config()
+                self.save_config()  # 立即保存配置
             
             # 执行用户选择的动作
-            if user_action[0] == 0:
+            if user_action[0] == 0:  # 退出
                 self.save_config()
                 QtWidgets.QApplication.quit()
-            elif user_action[0] == 1:
+            elif user_action[0] == 1:  # 最小化到托盘
                 event.ignore()
                 self.hide()
         else:
-            event.ignore()
-    
-    def handle_close_action(self, action, dialog):
-        self.close_action = action
-        self.save_config()
-        
-        if action == 0:
-            QtWidgets.QApplication.quit()
-        else:
-            self.hide()
-            dialog.accept()
+            event.ignore()  # 用户取消关闭操作
 
 
 def main():
@@ -1143,8 +1193,8 @@ def main():
     window.tray_icon = tray_icon
 
     tray_icon.show()
-    window.show_main_window()  # 使用新方法显示主窗口
-    
+    # 启动时不显示主窗口
+
     # 设置当最后一个窗口关闭时不退出应用程序
     app.setQuitOnLastWindowClosed(False)
     
