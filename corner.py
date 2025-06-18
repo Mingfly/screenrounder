@@ -5,7 +5,6 @@ import time
 import random
 from PyQt6 import QtWidgets, QtCore, QtGui
 
-
 class CornerWindow(QtWidgets.QWidget):
     def __init__(self, screen, position: str, radius: int, color: QtGui.QColor,
                  anti_burn_in=False, hide_mouse=False, burn_in_interval=10):
@@ -41,9 +40,16 @@ class CornerWindow(QtWidgets.QWidget):
         self.topmost_timer.timeout.connect(self.ensure_topmost)
         self.topmost_timer.start(5000)  # 每5秒而非1秒
 
-        self.burn_in_timer = QtCore.QTimer(self)
-        self.burn_in_timer.timeout.connect(self.anti_burn_in_update)
+        # 仅在需要时创建防烧屏定时器
+        self.burn_in_timer = None
         if self.anti_burn_in:
+            self.create_burn_in_timer()
+    
+    def create_burn_in_timer(self):
+        """仅在需要时创建防烧屏定时器"""
+        if self.burn_in_timer is None:
+            self.burn_in_timer = QtCore.QTimer(self)
+            self.burn_in_timer.timeout.connect(self.anti_burn_in_update)
             self.start_anti_burn_in_timer()
 
     def set_topmost(self):
@@ -105,7 +111,7 @@ class CornerWindow(QtWidgets.QWidget):
         painter.drawPath(path)
 
     def anti_burn_in_update(self):
-        if not self.anti_burn_in:
+        if not self.anti_burn_in or not self.burn_in_timer:
             return
         now = time.time()
         if now - self.last_move_time > self.burn_in_interval * 60:
@@ -118,12 +124,12 @@ class CornerWindow(QtWidgets.QWidget):
             self.last_reset_time = now
 
     def start_anti_burn_in_timer(self):
-        if self.anti_burn_in:
+        if self.anti_burn_in and self.burn_in_timer:
             self.burn_in_timer.start(self.burn_in_interval * 60 * 1000)
 
     def update_burn_in_interval(self, interval):
         self.burn_in_interval = interval
-        if self.anti_burn_in:
+        if self.anti_burn_in and self.burn_in_timer:
             self.burn_in_timer.stop()
             self.start_anti_burn_in_timer()
 
@@ -132,3 +138,11 @@ class CornerWindow(QtWidgets.QWidget):
             self.move(*self.original_pos)
             self.update()
             self.ensure_topmost()
+    
+    def close(self):
+        """重写close方法以释放资源"""
+        if self.topmost_timer and self.topmost_timer.isActive():
+            self.topmost_timer.stop()
+        if self.burn_in_timer and self.burn_in_timer.isActive():
+            self.burn_in_timer.stop()
+        super().close()
