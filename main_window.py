@@ -1,10 +1,12 @@
+#main_window.py
+import sys
+import os
 from PyQt6 import QtWidgets, QtGui, QtCore
 from corner import CornerWindow
 from config import load_config, save_config
 from utils import get_system_theme, get_icon_path
 from language import tr, set_language, CURRENT_LANG
 from signals import language_signal  # 导入全局语言信号
-import sys  # 新增导入
 
 CANDIDATE_COLORS = {
     "black": QtGui.QColor(0, 0, 0),
@@ -286,9 +288,10 @@ class MainWindow(QtWidgets.QWidget):
         for w in self.corners:
             w.anti_burn_in = enabled
             if enabled:
-                w.start_anti_burn_in_timer()
+                w.create_burn_in_timer()  # 确保定时器存在
             else:
-                w.burn_in_timer.stop()
+                if w.burn_in_timer and w.burn_in_timer.isActive():
+                    w.burn_in_timer.stop()
                 w.reset_position()
         self.config["anti_burn_in"] = enabled
         save_config(self.config)
@@ -317,6 +320,15 @@ class MainWindow(QtWidgets.QWidget):
         save_config(self.config)
 
     def refresh_corners(self):
+        # 只在实际需要时重建圆角窗口
+        current_screens = set(QtWidgets.QApplication.screens())
+        existing_screens = set(w.screen for w in self.corners)
+        
+        # 如果屏幕配置没有变化，直接返回
+        if current_screens == existing_screens:
+            return
+            
+        # 清除旧的圆角窗口
         for w in self.corners:
             w.close()
             w.deleteLater()
@@ -342,20 +354,25 @@ class MainWindow(QtWidgets.QWidget):
             self.hide()
 
     def show_close_dialog(self):
-        """Show close options dialog"""
+        """显示关闭对话框"""
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle(tr("close_title"))
-        dialog.setFixedSize(300, 150)  # 新增
-        layout = QtWidgets.QVBoxLayout(dialog)
-        layout.setContentsMargins(20, 20, 20, 20)  # 新增
+        dialog.setFixedSize(300, 150)
         
+        # 使用垂直布局作为主布局
+        main_layout = QtWidgets.QVBoxLayout(dialog)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(10)  # 减小全局间距
+        
+        # 消息标签 - 居中显示
         message = QtWidgets.QLabel(tr("close_message"))
-        message.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)  # 新增
-        message.setWordWrap(True)  # 新增
-        layout.addWidget(message)
+        message.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)  # 文本居中
+        message.setWordWrap(True)
+        main_layout.addWidget(message, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)  # 控件居中
         
+        # 按钮布局
         btn_layout = QtWidgets.QHBoxLayout()
-        btn_layout.setSpacing(10)  # 新增
+        btn_layout.setSpacing(10)
         
         exit_btn = QtWidgets.QPushButton(tr("close_exit"))
         exit_btn.clicked.connect(lambda: self.handle_close_choice(0, dialog))
@@ -363,16 +380,17 @@ class MainWindow(QtWidgets.QWidget):
         
         minimize_btn = QtWidgets.QPushButton(tr("close_minimize"))
         minimize_btn.clicked.connect(lambda: self.handle_close_choice(1, dialog))
+        minimize_btn.setDefault(True)  # 设置为默认按钮
+        minimize_btn.setAutoDefault(True)  # 确保可以响应回车键
         btn_layout.addWidget(minimize_btn)
         
-        layout.addLayout(btn_layout)
+        main_layout.addLayout(btn_layout)
         
+        # 复选框 - 居中显示
         remember_check = QtWidgets.QCheckBox(tr("remember_choice"))
-        layout.addWidget(remember_check)
-        layout.setAlignment(remember_check, QtCore.Qt.AlignmentFlag.AlignLeft)  # 新增
+        main_layout.addWidget(remember_check, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)  # 控件居中
         
         dialog.exec()
-
     def handle_close_choice(self, choice, dialog):
         """Process user choice from close dialog"""
         remember = dialog.findChild(QtWidgets.QCheckBox).isChecked()
@@ -405,6 +423,7 @@ class MainWindow(QtWidgets.QWidget):
             button_bg = "#606060"
             button_hover = "#707070"
             button_text = "#f0f0f0"
+            selection_bg = "#5c7cfa"
             slider_groove = "#505050"
             slider_handle = "#5c7cfa"
             slider_subpage = "#5c7cfa"
@@ -420,6 +439,7 @@ class MainWindow(QtWidgets.QWidget):
             button_bg = "#f0f0f0"
             button_hover = "#e0e0e0"
             button_text = "#333333"
+            selection_bg = "#d0e0ff"
             slider_groove = "#e0e0e0"
             slider_handle = "#5c7cfa"
             slider_subpage = "#5c7cfa"
@@ -430,6 +450,14 @@ class MainWindow(QtWidgets.QWidget):
             QWidget {{
                 background-color: {window_bg};
                 color: {text_color};
+            }}
+                    /* 添加透明工具提示样式 */
+            QToolTip {{
+                background-color: {window_bg};  /* 透明背景 */
+                color: {text_color};            /* 文字颜色随主题变化 */
+                border: 1px solid {spinbox_border}; /* 边框颜色 */
+                border-radius: 4px;            /* 圆角半径 */
+                padding: 2px 2px;              /* 内边距 */
             }}
         """)
         
@@ -463,8 +491,24 @@ class MainWindow(QtWidgets.QWidget):
             }}
         """
         self.color_btn.setStyleSheet(button_style)
+            # 获取基础路径（确保路径正确）
+        base_dir = os.path.dirname(os.path.abspath(__file__))
         
-        # 设置SpinBox样式
+        # 根据主题选择箭头图标
+        if self.current_theme == "dark":
+            # 深色主题使用浅色图标
+            up_arrow_file = os.path.join(base_dir, "images", "up_arrow_light.svg")
+            down_arrow_file = os.path.join(base_dir, "images", "down_arrow_light.svg")
+        else:
+            # 浅色主题使用深色图标
+            up_arrow_file = os.path.join(base_dir, "images", "up_arrow_dark.svg")
+            down_arrow_file = os.path.join(base_dir, "images", "down_arrow_dark.svg")
+
+        # 确保路径使用正斜杠（跨平台兼容）
+        up_arrow_path = up_arrow_file.replace("\\", "/")
+        down_arrow_path = down_arrow_file.replace("\\", "/")
+
+        # 设置SpinBox样式 - 修复按钮大小不一致问题
         spinbox_style = f"""
             QSpinBox {{
                 background-color: {spinbox_bg};
@@ -472,6 +516,51 @@ class MainWindow(QtWidgets.QWidget):
                 border: 1px solid {spinbox_border};
                 border-radius: 4px;
                 padding: 3px;
+                padding-right: 20px; /* 为箭头按钮留出足够空间 */
+                selection-background-color: {selection_bg};  /* 选中文本的背景色 */
+                selection-color: {text_color};             /* 选中文本的颜色 */
+            }}
+            /* 按钮容器 */
+            QSpinBox::up-button, QSpinBox::down-button {{
+                subcontrol-origin: border;
+                background-color: {spinbox_bg};
+                border: 1px solid {spinbox_border};
+                border-radius: 2px;
+                width: 16px; /* 固定宽度 */
+                height: 9px; /* 固定高度 - 确保两个按钮相同 */
+                margin: 0;
+            }}
+            /* 上按钮位置 */
+            QSpinBox::up-button {{
+                subcontrol-position: top right;
+                top: 2px;
+                right: 2px;
+                border-bottom-left-radius: 0;
+                border-bottom-right-radius: 0;
+            }}
+            /* 下按钮位置 */
+            QSpinBox::down-button {{
+                subcontrol-position: bottom right;
+                bottom: 2px;
+                right: 2px;
+                border-top-left-radius: 0;
+                border-top-right-radius: 0;
+            }}
+            /* 按钮悬停效果 */
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+                background-color: {button_hover};
+            }}
+            /* 上箭头图标 */
+            QSpinBox::up-arrow {{
+                width: 8px;
+                height: 8px;
+                image: url("{up_arrow_path}");
+            }}
+            /* 下箭头图标 */
+            QSpinBox::down-arrow {{
+                width: 8px;
+                height: 8px;
+                image: url("{down_arrow_path}");
             }}
         """
         self.burn_interval_spin.setStyleSheet(spinbox_style)
@@ -541,7 +630,7 @@ class MainWindow(QtWidgets.QWidget):
         
         # 更新所有标签文本
         self.title_label.setText(tr("app_name"))
-        self.title1_label.setText(tr("app_name"))
+        self.title_label.setText(tr("app_name"))
         self.radius_label.setText(tr("radius_label"))
         self.color_label.setText(tr("color_label"))
         self.color_btn.setText(tr("pick_color"))
