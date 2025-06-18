@@ -7,7 +7,7 @@
 新版界面：
 ![主界面](https://github.com/user-attachments/assets/07d447bd-c551-415a-8ec5-d7859f5d8384)
 
-![菜单](https://github.com/user-attachments/assets/1ca54c21-de2b-44ce-b645-a97014dc0b5f)
+![菜单](https://github.com/user-attachments/assets/aac02c36-5ff8-4877-9347-0fafb972014f)
 
 旧版界面：
 ![主界面](https://github.com/user-attachments/assets/36529b57-f26c-4f7b-bab8-fc005982376e)
