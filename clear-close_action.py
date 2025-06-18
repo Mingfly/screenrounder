@@ -1,3 +1,4 @@
+#clear-close_action.py
 import os
 import json
 
@@ -32,6 +33,9 @@ def reset_close_action():
     
     except Exception as e:
         print(f"操作失败: {e}")
+        # 添加更具体的错误信息
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     print("正在重置关闭行为设置...")
