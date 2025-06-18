@@ -3,7 +3,7 @@ import os
 import winreg
 from PyQt6 import QtWidgets, QtGui, QtCore
 from language import tr, get_language_list, set_language
-from config import load_config, save_config
+from config import load_config, save_config, DEFAULT_CONFIG
 from PyQt6.QtCore import QObject, pyqtSignal
 from signals import language_signal
 from utils import get_system_theme  # 导入获取系统主题的函数
@@ -33,7 +33,7 @@ class TrayApp(QtWidgets.QSystemTrayIcon):
         # 添加主题变化检测定时器
         self.theme_timer = QtCore.QTimer(self)
         self.theme_timer.timeout.connect(self.check_theme_change)
-        self.theme_timer.start(5000)  # 每5秒检查一次主题变化
+        self.theme_timer.start(10000)  # 降低检测频率到10秒一次
 
     def check_theme_change(self):
         """检测系统主题是否变化"""
@@ -138,6 +138,10 @@ class TrayApp(QtWidgets.QSystemTrayIcon):
         refresh_action = self.menu.addAction(tr("refresh_monitors"))
         refresh_action.triggered.connect(self.parent.refresh_corners)
         
+        # 添加恢复默认值功能
+        reset_action = self.menu.addAction(tr("reset_defaults"))
+        reset_action.triggered.connect(self.reset_to_defaults)
+        
         self.menu.addSeparator()
 
         self.color_menu = QtWidgets.QMenu(tr("corner_color"), self.menu)
@@ -177,6 +181,49 @@ class TrayApp(QtWidgets.QSystemTrayIcon):
         exit_action.triggered.connect(QtWidgets.QApplication.quit)
         
         self.update_menu_style()
+
+    def reset_to_defaults(self):
+        """将所有设置恢复为默认值"""
+        # 获取默认配置
+        default = DEFAULT_CONFIG
+        
+        # 更新主窗口中的控件值
+        # 圆角半径设为10
+        self.parent.radius_slider.setValue(default["radius"])
+        
+        # 圆角颜色设为纯黑色
+        black_color = QtGui.QColor(*default["color"])
+        self.parent.set_corner_color(black_color)
+        
+        # 防烧屏间隔设为10
+        self.parent.burn_interval_spin.setValue(default["burn_in_interval"])
+        
+        # 启动防烧屏 - 勾选
+        self.parent.anti_burn_check.setChecked(default["anti_burn_in"])
+        
+        # 隐藏圆角区域鼠标 - 勾选
+        self.parent.mouse_check.setChecked(default["transparent_mouse"])
+        
+        # 启动时隐藏主界面 - 不勾选
+        self.parent.hide_on_startup_check.setChecked(default["hide_on_startup"])
+        
+        # 关闭动作设为默认None
+        self.parent.close_action = default["close_action"]
+        self.parent.config["close_action"] = default["close_action"]
+        
+        # 保存所有更改
+        save_config(self.parent.config)
+        
+        # 刷新圆角显示
+        self.parent.refresh_corners()
+        
+        # 显示成功消息
+        QtWidgets.QMessageBox.information(
+            self.parent,
+            tr("reset_success_title"),
+            tr("reset_success_message"),
+            QtWidgets.QMessageBox.StandardButton.Ok
+        )
 
     def create_color_icon(self, color):
         pixmap = QtGui.QPixmap(16, 16)
