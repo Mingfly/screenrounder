@@ -1,3 +1,4 @@
+#main.py
 import sys
 import os
 import platform
@@ -80,8 +81,12 @@ class SingleInstance:
                     return True
                 return False
             else:
-                os.kill(pid, 0)
-                return True
+                import signal
+                try:
+                    os.kill(pid, 0)
+                    return True
+                except OSError:
+                    return False
         except:
             return False
     
