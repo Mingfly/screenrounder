@@ -134,8 +134,12 @@ class CornerWindow(QtWidgets.QWidget):
             self.start_anti_burn_in_timer()
 
     def reset_position(self):
+        """重置窗口到原始位置"""
         if self.original_pos:
             self.move(*self.original_pos)
+            # 重置防烧屏计时器
+            self.last_move_time = time.time()
+            self.last_reset_time = time.time()
             self.update()
             self.ensure_topmost()
     
