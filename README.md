@@ -5,7 +5,7 @@
 ![圆角效果](https://github.com/user-attachments/assets/fd3f052a-14d0-43f3-ae86-6db91ef5c8c9)
 
 新版界面：
-![主界面](https://github.com/user-attachments/assets/07d447bd-c551-415a-8ec5-d7859f5d8384)
+![主界面](https://github.com/user-attachments/assets/6adea31c-fb09-4556-8214-6befae1be4e9)
 
 ![菜单](https://github.com/user-attachments/assets/aac02c36-5ff8-4877-9347-0fafb972014f)
 
