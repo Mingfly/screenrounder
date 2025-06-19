@@ -3,7 +3,6 @@ import os
 import sys
 import locale
 import ctypes
-import platform
 import winreg
 
 def get_icon_path():
