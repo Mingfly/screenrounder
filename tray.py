@@ -137,7 +137,7 @@ class TrayApp(QtWidgets.QSystemTrayIcon):
         show_action.triggered.connect(lambda: self.parent.show())
 
         refresh_action = self.menu.addAction(tr("refresh_monitors"))
-        refresh_action.triggered.connect(self.parent.refresh_corners)
+        refresh_action.triggered.connect(lambda: self.parent.refresh_corners(force_reset=True))
         
         # 添加恢复默认值功能
         reset_action = self.menu.addAction(tr("reset_defaults"))
