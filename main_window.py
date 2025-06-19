@@ -319,15 +319,8 @@ class MainWindow(QtWidgets.QWidget):
         self.config["burn_in_interval"] = val
         save_config(self.config)
 
-    def refresh_corners(self):
-        # 只在实际需要时重建圆角窗口
-        current_screens = set(QtWidgets.QApplication.screens())
-        existing_screens = set(w.screen for w in self.corners)
-        
-        # 如果屏幕配置没有变化，直接返回
-        if current_screens == existing_screens:
-            return
-            
+    def refresh_corners(self, force_reset=False):
+        """刷新所有显示器的圆角窗口"""
         # 清除旧的圆角窗口
         for w in self.corners:
             w.close()
@@ -338,9 +331,12 @@ class MainWindow(QtWidgets.QWidget):
         for screen in screens:
             for pos in ['tl', 'tr', 'bl', 'br']:
                 w = CornerWindow(screen, pos, self.radius_slider.value(),
-                                 self.corner_color, self.anti_burn_in_enabled,
-                                 self.transparent_mouse_enabled,
-                                 self.burn_interval_spin.value())
+                                self.corner_color, self.anti_burn_in_enabled,
+                                self.transparent_mouse_enabled,
+                                self.burn_interval_spin.value())
+                # 如果强制重置，则重置位置
+                if force_reset:
+                    w.reset_position()
                 QtCore.QTimer.singleShot(100, w.show)
                 self.corners.append(w)
 
