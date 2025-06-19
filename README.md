@@ -2,7 +2,7 @@
 基于Python实现电脑屏幕圆角效果（windows平台）
 
 圆角效果：
-![圆角效果](https://github.com/user-attachments/assets/fd3f052a-14d0-43f3-ae86-6db91ef5c8c9)
+![圆角效果](https://github.com/user-attachments/assets/ff7143eb-30b1-46be-b4a6-4519692b4bcc)
 
 新版界面：
 ![主界面](https://github.com/user-attachments/assets/6adea31c-fb09-4556-8214-6befae1be4e9)
