@@ -414,7 +414,7 @@ class MainWindow(QtWidgets.QWidget):
         # 设置窗口背景色
         if self.current_theme == "dark":
             window_bg = "#2d2d30"
-            text_color = "#f0f0f0"
+            text_color = "#ffffff"
             title_color  = "#2d2d30"
             label_color = "#e0e0e0"
             value_color = "#f0f0f0"
@@ -425,6 +425,7 @@ class MainWindow(QtWidgets.QWidget):
             button_text = "#f0f0f0"
             selection_bg = "#5c7cfa"
             slider_groove = "#505050"
+            slider_border = "#6B6B6B"
             slider_handle = "#5c7cfa"
             slider_subpage = "#5c7cfa"
             border_color = "#d0d0d0"  # 更亮的边框颜色，提高对比度
@@ -441,9 +442,27 @@ class MainWindow(QtWidgets.QWidget):
             button_text = "#333333"
             selection_bg = "#d0e0ff"
             slider_groove = "#e0e0e0"
+            slider_border = "#D8D8D8"
             slider_handle = "#5c7cfa"
             slider_subpage = "#5c7cfa"
             border_color = "#505050"  # 更暗的边框颜色，提高对比度
+        
+        # 获取基础路径（确保路径正确）
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # 根据主题选择调节箭头图标
+        if self.current_theme == "dark":
+            # 深色主题使用浅色图标
+            up_arrow_file = os.path.join(base_dir, "images", "up_arrow_light.svg")
+            down_arrow_file = os.path.join(base_dir, "images", "down_arrow_light.svg")
+        else:
+            # 浅色主题使用深色图标
+            up_arrow_file = os.path.join(base_dir, "images", "up_arrow_dark.svg")
+            down_arrow_file = os.path.join(base_dir, "images", "down_arrow_dark.svg")
+
+        # 确保路径使用正斜杠（跨平台兼容）
+        up_arrow_path = up_arrow_file.replace("\\", "/")
+        down_arrow_path = down_arrow_file.replace("\\", "/")
         
         # 设置窗口背景色
         self.setStyleSheet(f"""
@@ -460,10 +479,6 @@ class MainWindow(QtWidgets.QWidget):
                 padding: 2px 2px;              /* 内边距 */
             }}
         """)
-        
-        # 设置标题样式
-        self.setWindowTitle
-        self.title_label.setStyleSheet(f"color: {text_color};" f"background-color: {title_color}")
         
         # 设置标签样式
         labels = [
@@ -491,22 +506,6 @@ class MainWindow(QtWidgets.QWidget):
             }}
         """
         self.color_btn.setStyleSheet(button_style)
-            # 获取基础路径（确保路径正确）
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # 根据主题选择箭头图标
-        if self.current_theme == "dark":
-            # 深色主题使用浅色图标
-            up_arrow_file = os.path.join(base_dir, "images", "up_arrow_light.svg")
-            down_arrow_file = os.path.join(base_dir, "images", "down_arrow_light.svg")
-        else:
-            # 浅色主题使用深色图标
-            up_arrow_file = os.path.join(base_dir, "images", "up_arrow_dark.svg")
-            down_arrow_file = os.path.join(base_dir, "images", "down_arrow_dark.svg")
-
-        # 确保路径使用正斜杠（跨平台兼容）
-        up_arrow_path = up_arrow_file.replace("\\", "/")
-        down_arrow_path = down_arrow_file.replace("\\", "/")
 
         # 设置SpinBox样式 - 修复按钮大小不一致问题
         spinbox_style = f"""
@@ -569,8 +568,9 @@ class MainWindow(QtWidgets.QWidget):
         slider_style = f"""
             QSlider::groove:horizontal {{
                 height: 5px;
-                margin: 1px 1; 
+                margin: 1px 1px; 
                 background: {slider_groove};
+                border: 1px solid {slider_border};
                 border-radius: 3px;
             }}
             QSlider::handle:horizontal {{
@@ -591,7 +591,7 @@ class MainWindow(QtWidgets.QWidget):
             }}
             QSlider::sub-page:horizontal {{
                 background: {slider_subpage};
-                border-radius: 2px;
+                border-radius: 4px;
             }}
         """
         self.radius_slider.setStyleSheet(slider_style)
@@ -623,6 +623,10 @@ class MainWindow(QtWidgets.QWidget):
         icon_path = get_icon_path()
         if icon_path:
             self.setWindowIcon(QtGui.QIcon(icon_path))
+        
+        # 设置标题样式
+        self.setWindowTitle
+        self.title_label.setStyleSheet(f"color: {text_color};" f"background-color: {title_color}")
 
     def update_ui_language(self):
         """更新所有UI元素的文本内容"""
