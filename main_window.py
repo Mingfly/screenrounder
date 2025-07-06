@@ -109,34 +109,6 @@ class MainWindow(QtWidgets.QWidget):
         self.radius_slider.setRange(1, 100)
         self.radius_slider.setValue(self.config.get("radius", 20))
         self.radius_slider.valueChanged.connect(self.update_radius)
-        self.radius_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                height: 5px;
-                margin: 1px 1;
-                background: #e0e0e0;
-                border-radius: 3px;
-            }
-            QSlider::handle:horizontal {
-                background: #5c7cfa;
-                border: 1px;
-                width: 12px;
-                height: 12px;
-                margin: -4px 0;
-                border-radius: 6px;
-            }
-            QSlider::handle:horizontal:pressed {
-                background: #5c7cfa;
-                border: 1.2px solid #ffffff;
-                width: 13px;
-                height: 12px;
-                margin: -4.5px 0;
-                border-radius: 6.5px;
-            }
-            QSlider::sub-page:horizontal {
-                background: #5c7cfa;
-                border-radius: 3px;
-            }
-        """)
         
         self.radius_value = QtWidgets.QLabel(str(self.radius_slider.value()))
         self.radius_value.setFixedWidth(35)
